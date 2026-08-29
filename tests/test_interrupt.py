@@ -47,7 +47,7 @@ def test_low_confidence_email_interrupts_but_high_confidence_auto_executes():
         thread_id=unique_thread("low-confidence"),
     )
     assert pending["values"]["proposed_action"] == "send_email"
-    assert pending["values"]["confidence_score"] == 0.82
+    assert pending["values"]["confidence_score"] == 0.84
     assert pending["is_paused"] is True
 
     automatic = start_customer_workflow(
@@ -57,6 +57,7 @@ def test_low_confidence_email_interrupts_but_high_confidence_auto_executes():
         thread_id=unique_thread("auto"),
     )
     assert automatic["next"] == []
+    assert automatic["values"]["confidence_score"] == 0.94
     assert automatic["values"]["execution_status"] == "completed"
     assert automatic["values"]["executed_payload"] == {"template": "customer_care"}
 

@@ -53,12 +53,19 @@ def evaluate_customer(state: GraphState) -> dict[str, Any]:
         default_payload = {"template": "customer_care"}
         explanation = "low churn signal and non-financial outreach are low risk"
 
+    # TOI is an independent business signal, not merely text echoed in the
+    # explanation. It calibrates the recommendation confidence before routing.
+    toi_adjustment = {"low": -0.02, "medium": 0.0, "high": 0.02}[customer.toi]
+    confidence = round(max(0.0, min(1.0, confidence + toi_adjustment)), 2)
+    adjustment_text = f"TOI={customer.toi} adjusts confidence by {toi_adjustment:+.2f}"
+
     evaluation = AgentEvaluation(
         proposed_action=action,
         confidence_score=confidence,
         reasoning=(
             f"Customer {customer.customer_id} has TOI={customer.toi} and "
-            f"churn_probability={customer.churn_probability:.2f}; {explanation}."
+            f"churn_probability={customer.churn_probability:.2f}; {explanation}; "
+            f"{adjustment_text}."
         ),
     )
     payload = customer.action_payload or default_payload
@@ -230,6 +237,7 @@ def start_customer_workflow(
     churn_probability: float,
     action_payload: dict[str, Any] | None = None,
     thread_id: str | None = None,
+    graph: Any | None = None,
 ) -> dict[str, Any]:
     customer = CustomerInput(
         customer_id=customer_id,
@@ -239,7 +247,8 @@ def start_customer_workflow(
     )
     resolved_thread_id = thread_id or f"customer-{customer.customer_id}-{uuid.uuid4().hex}"
     config = workflow_config(resolved_thread_id)
-    existing = hitl_graph.get_state(config)
+    workflow_graph = graph or hitl_graph
+    existing = workflow_graph.get_state(config)
     if existing and existing.values:
         raise ValueError("thread_id already exists; create a unique workflow thread")
 
@@ -259,15 +268,20 @@ def start_customer_workflow(
         "executed_payload": None,
         "agent_id": AGENT_ID,
     }
-    hitl_graph.invoke(initial_state, config=config)
-    return get_current_workflow_state(resolved_thread_id) or {}
+    workflow_graph.invoke(initial_state, config=config)
+    return get_current_workflow_state(resolved_thread_id, graph=workflow_graph) or {}
 
 
-def submit_human_decision(thread_id: str, decision: HumanDecision | dict[str, Any]) -> dict[str, Any]:
+def submit_human_decision(
+    thread_id: str,
+    decision: HumanDecision | dict[str, Any],
+    graph: Any | None = None,
+) -> dict[str, Any]:
     validated = HumanDecision.model_validate(decision)
     config = workflow_config(thread_id)
+    workflow_graph = graph or hitl_graph
     with _SUBMISSION_LOCK:
-        snapshot = hitl_graph.get_state(config)
+        snapshot = workflow_graph.get_state(config)
         if not snapshot or not snapshot.values:
             raise ValueError(f"workflow not found for thread_id: {thread_id}")
         if tuple(snapshot.next) != ("execute_high_risk_action",):
@@ -277,14 +291,18 @@ def submit_human_decision(thread_id: str, decision: HumanDecision | dict[str, An
             "human_decision": validated.model_dump(mode="json"),
             "reviewer_id": validated.reviewer_id,
         }
-        hitl_graph.update_state(config, state_update)
-        hitl_graph.invoke(None, config=config)
-        final = hitl_graph.get_state(config)
+        workflow_graph.update_state(config, state_update)
+        workflow_graph.invoke(None, config=config)
+        final = workflow_graph.get_state(config)
         return dict(final.values)
 
 
-def get_current_workflow_state(thread_id: str) -> dict[str, Any] | None:
-    snapshot = hitl_graph.get_state(workflow_config(thread_id))
+def get_current_workflow_state(
+    thread_id: str,
+    graph: Any | None = None,
+) -> dict[str, Any] | None:
+    workflow_graph = graph or hitl_graph
+    snapshot = workflow_graph.get_state(workflow_config(thread_id))
     if not snapshot or not snapshot.values:
         return None
     return {

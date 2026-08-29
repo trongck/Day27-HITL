@@ -36,9 +36,28 @@ def test_agent_reasoning_is_deterministic_and_complete():
     second = evaluate_customer(state)
     assert first == second
     assert first["proposed_action"] == "send_email"
-    assert first["confidence_score"] == 0.92
+    assert first["confidence_score"] == 0.94
     assert "TOI=high" in first["reasoning"]
     assert "churn_probability=0.25" in first["reasoning"]
+    assert "adjusts confidence by +0.02" in first["reasoning"]
+
+
+def test_toi_calibrates_confidence_before_routing():
+    base_state: GraphState = {
+        "customer_id": "CUST-TOI",
+        "toi": "low",
+        "churn_probability": 0.25,
+        "action_payload": {},
+        "proposed_action": "pending",
+        "confidence_score": 0.0,
+        "reasoning": "pending",
+        "human_decision": None,
+    }
+    low_toi = evaluate_customer(base_state)
+    high_toi = evaluate_customer({**base_state, "toi": "high"})
+    assert low_toi["confidence_score"] == 0.90
+    assert high_toi["confidence_score"] == 0.94
+    assert low_toi["confidence_score"] < high_toi["confidence_score"]
 
 
 @pytest.mark.parametrize(

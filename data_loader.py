@@ -9,7 +9,7 @@ import pandas as pd
 from datasets import load_dataset
 
 
-DATA_FILE = Path(__file__).parent / "ecommerce_customers_200.json"
+DATA_FILE = Path(__file__).parent / "data" / "ecommerce_customers_200.json"
 
 
 def fetch_and_save_hf_data(limit: int = 200, output_path: Path = DATA_FILE) -> list[dict[str, Any]]:

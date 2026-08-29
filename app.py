@@ -10,6 +10,7 @@ load_dotenv()
 
 from graph import (
     MAX_CREDIT_LIMIT_INCREASE,
+    build_hitl_graph,
     get_current_workflow_state,
     start_customer_workflow,
     submit_human_decision,
@@ -23,16 +24,26 @@ st.caption("LangGraph checkpoint, hard-policy routing, human approval and append
 
 if "thread_id" not in st.session_state:
     st.session_state.thread_id = None
+if "hitl_graph" not in st.session_state:
+    st.session_state.hitl_graph = build_hitl_graph()
 
 
 def current_workflow() -> dict | None:
     thread_id = st.session_state.thread_id
-    return get_current_workflow_state(thread_id) if thread_id else None
+    return (
+        get_current_workflow_state(thread_id, graph=st.session_state.hitl_graph)
+        if thread_id
+        else None
+    )
 
 
 def apply_decision(decision: HumanDecision) -> None:
     try:
-        submit_human_decision(st.session_state.thread_id, decision)
+        submit_human_decision(
+            st.session_state.thread_id,
+            decision,
+            graph=st.session_state.hitl_graph,
+        )
     except Exception as exc:
         st.error(f"Không thể xử lý quyết định: {exc}")
     else:
@@ -61,27 +72,27 @@ with workflow_tab:
     st.markdown("#### ⚡ Thử nghiệm nhanh 4 kịch bản chuẩn của Lab HITL:")
     sc_col1, sc_col2, sc_col3, sc_col4 = st.columns(4)
     
-    if sc_col1.button("🟢 1. Low Churn (Auto-run)", use_container_width=True, help="Churn=0.25 -> send_email (Confidence=92% >= 85%) -> Tự động thực thi"):
+    if sc_col1.button("🟢 1. Low Churn (Auto-run)", use_container_width=True, help="Churn=0.25, TOI=low -> send_email (Confidence=90% >= 85%) -> Tự động thực thi"):
         thread_id = f"customer-CUST_AUTO-{uuid.uuid4().hex}"
-        start_customer_workflow(customer_id="CUST_LOW_01", toi="low", churn_probability=0.25, thread_id=thread_id)
+        start_customer_workflow(customer_id="CUST_LOW_01", toi="low", churn_probability=0.25, thread_id=thread_id, graph=st.session_state.hitl_graph)
         st.session_state.thread_id = thread_id
         st.rerun()
 
     if sc_col2.button("🟡 2. Med Churn (Dừng duyệt Email)", use_container_width=True, help="Churn=0.55 -> send_email (Confidence=82% < 85%) -> DỪNG CHỜ DUYỆT"):
         thread_id = f"customer-CUST_REVIEW-{uuid.uuid4().hex}"
-        start_customer_workflow(customer_id="CUST_MED_02", toi="medium", churn_probability=0.55, thread_id=thread_id)
+        start_customer_workflow(customer_id="CUST_MED_02", toi="medium", churn_probability=0.55, thread_id=thread_id, graph=st.session_state.hitl_graph)
         st.session_state.thread_id = thread_id
         st.rerun()
 
     if sc_col3.button("🚨 3. High Churn (Dừng Tín dụng)", use_container_width=True, help="Churn=0.82 -> increase_credit_limit -> HARD POLICY: LUÔN DỪNG CHỜ DUYỆT"):
         thread_id = f"customer-CUST_HIGHRISK-{uuid.uuid4().hex}"
-        start_customer_workflow(customer_id="CUST_HIGH_03", toi="high", churn_probability=0.82, thread_id=thread_id)
+        start_customer_workflow(customer_id="CUST_HIGH_03", toi="high", churn_probability=0.82, thread_id=thread_id, graph=st.session_state.hitl_graph)
         st.session_state.thread_id = thread_id
         st.rerun()
 
     if sc_col4.button("✏️ 4. Chỉnh sửa số tiền (Edit)", use_container_width=True, help="Tạo ca Churn cao 0.85 để bạn vào tab Edit chỉnh sửa số tiền từ 50tr thành 20tr"):
         thread_id = f"customer-CUST_EDIT-{uuid.uuid4().hex}"
-        start_customer_workflow(customer_id="CUST_EDIT_04", toi="high", churn_probability=0.85, thread_id=thread_id)
+        start_customer_workflow(customer_id="CUST_EDIT_04", toi="high", churn_probability=0.85, thread_id=thread_id, graph=st.session_state.hitl_graph)
         st.session_state.thread_id = thread_id
         st.rerun()
 
@@ -141,6 +152,7 @@ with workflow_tab:
                         churn_probability=selected_cust["churn_probability"],
                         action_payload=selected_cust.get("action_payload"),
                         thread_id=thread_id,
+                        graph=st.session_state.hitl_graph,
                     )
                 except Exception as exc:
                     st.error(f"Không thể khởi chạy workflow: {exc}")
@@ -164,6 +176,7 @@ with workflow_tab:
                         toi=toi,
                         churn_probability=churn_probability,
                         thread_id=thread_id,
+                        graph=st.session_state.hitl_graph,
                     )
                 except Exception as exc:
                     st.error(f"Không thể khởi chạy workflow: {exc}")

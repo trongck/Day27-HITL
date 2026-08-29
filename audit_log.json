@@ -1,1 +1,32 @@
-[]
+[
+  {
+    "timestamp": "2026-08-29T10:29:40.461283Z",
+    "agent_id": "customer-retention-agent",
+    "action": "send_email",
+    "confidence": 0.82,
+    "reviewer_id": "010",
+    "decision": "approve",
+    "id": "ece99114-b188-4882-b20d-acf93f2af848",
+    "customer_id": "CUST_MED_02",
+    "thread_id": "customer-CUST_REVIEW-0a4c07a9312a4e72894d9386cc8a76b1",
+    "action_payload": {
+      "template": "retention_offer"
+    },
+    "reason": null
+  },
+  {
+    "timestamp": "2026-08-29T10:31:25.978232Z",
+    "agent_id": "customer-retention-agent",
+    "action": "send_email",
+    "confidence": 0.82,
+    "reviewer_id": "ad",
+    "decision": "approve",
+    "id": "0606d0e1-082b-460a-8921-1530b81d32c6",
+    "customer_id": "CUST_MED_02",
+    "thread_id": "customer-CUST_REVIEW-2368bda7cb6f4e0c8f140987fec9943b",
+    "action_payload": {
+      "template": "retention_offer"
+    },
+    "reason": "sad"
+  }
+]
